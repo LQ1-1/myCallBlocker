@@ -1,3 +1,64 @@
 <resources>
     <string name="app_name">MyCallBlocker</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_settings">Logs &amp; Settings</string>
+
+    <!-- Home Screen -->
+    <string name="title_app_name">🛡️ Call Blocker</string>
+    <string name="status_intercept_all_except_contacts">Blocking all except contacts</string>
+    <string name="status_intercept_all_warning">Blocking ALL calls (Careful!)</string>
+    <string name="status_stop_intercept">Interception Stopped</string>
+    <string name="status_paused">Service Paused</string>
+
+    <string name="setting_intercept_service">Call Blocking Service</string>
+    <string name="setting_whitelist">Contact Whitelist</string>
+    <string name="status_on">On (Running)</string>
+    <string name="status_off">Off</string>
+    <string name="status_need_auth">⚠️ Permission Needed</string>
+    <string name="action_enable">Enable</string>
+    <string name="action_disable">Disable</string>
+
+    <!-- Logs & Settings -->
+    <string name="perm_status">Permissions Status</string>
+    <string name="perm_intercept">Blocking Service</string>
+    <string name="perm_contact">Read Contacts</string>
+
+    <string name="log_title">Call Logs</string>
+    <string name="log_selected_count">Selected %d</string>
+    <string name="action_select_all">All</string>
+    <string name="action_unselect_all">None</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_clear">Clear</string>
+    <string name="msg_deleted">Deleted</string>
+    <string name="msg_cleared">Cleared</string>
+    <string name="msg_no_records">No Records</string>
+    <string name="msg_no_more">No more records</string>
+
+    <!-- Service Reasons -->
+    <string name="reason_service_paused">Service Paused</string>
+    <string name="reason_no_perm">No Permission (Allowed)</string>
+    <string name="reason_contact">Contact</string>
+    <string name="reason_stranger">Stranger Blocked</string>
+    <string name="reason_block_all">Block All Mode</string>
+    <string name="action_blocked">Blocked</string>
+    <string name="action_allowed">Allowed</string>
+    <string name="unknown_number">Unknown</string>
+
+    <!-- Language -->
+    <string name="language_setting">Language</string>
+    <string name="lang_follow_system">System Default</string>
+    <string name="lang_en">English</string>
+    <string name="lang_zh">Chinese</string>
+
+    <!-- Dialog -->
+    <string name="dialog_date_clean">Clean by Date</string>
+    <string name="dialog_by_month">By Month</string>
+    <string name="dialog_by_year">By Year</string>
+    <string name="label_year">Year</string>
+    <string name="label_month">Month (1-12)</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_confirm_delete">Delete</string>
 </resources>

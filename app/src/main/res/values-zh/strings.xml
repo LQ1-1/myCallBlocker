@@ -1,0 +1,64 @@
+<resources>
+    <string name="app_name">MyCallBlocker</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">主页</string>
+    <string name="nav_settings">记录 &amp; 设置</string>
+
+    <!-- Home Screen -->
+    <string name="title_app_name">🛡️ MyCallBlocker</string>
+    <string name="status_intercept_all_except_contacts">拦截所有来电除了通讯录好友</string>
+    <string name="status_intercept_all_warning">拦截所有来电 (慎用!)</string>
+    <string name="status_stop_intercept">停止拦截来电</string>
+    <string name="status_paused">拦截服务暂停</string>
+
+    <string name="setting_intercept_service">电话拦截服务</string>
+    <string name="setting_whitelist">通讯录白名单</string>
+    <string name="status_on">已开启 (运行中)</string>
+    <string name="status_off">已关闭</string>
+    <string name="status_need_auth">⚠️ 需授权</string>
+    <string name="action_enable">开启</string>
+    <string name="action_disable">关闭</string>
+
+    <!-- Logs & Settings -->
+    <string name="perm_status">App 权限状态</string>
+    <string name="perm_intercept">拦截服务权限</string>
+    <string name="perm_contact">通讯录读取权限</string>
+
+    <string name="log_title">拦截记录</string>
+    <string name="log_selected_count">已选 %d 项</string>
+    <string name="action_select_all">全选</string>
+    <string name="action_unselect_all">全不选</string>
+    <string name="action_delete">删除</string>
+    <string name="action_refresh">刷新</string>
+    <string name="action_clear">清空</string>
+    <string name="msg_deleted">已删除</string>
+    <string name="msg_cleared">已清空</string>
+    <string name="msg_no_records">暂无记录</string>
+    <string name="msg_no_more">— 没有更多了 —</string>
+
+    <!-- Service Reasons -->
+    <string name="reason_service_paused">服务暂停(用户关闭)</string>
+    <string name="reason_no_perm">无通讯录权限(强制放行)</string>
+    <string name="reason_contact">通讯录好友</string>
+    <string name="reason_stranger">陌生号码拦截</string>
+    <string name="reason_block_all">全员拦截模式</string>
+    <string name="action_blocked">已拦截</string>
+    <string name="action_allowed">已放行</string>
+    <string name="unknown_number">未知</string>
+
+    <!-- Language -->
+    <string name="language_setting">语言设置</string>
+    <string name="lang_follow_system">跟随系统</string>
+    <string name="lang_en">English</string>
+    <string name="lang_zh">中文</string>
+
+    <!-- Dialog -->
+    <string name="dialog_date_clean">按日期清理</string>
+    <string name="dialog_by_month">按月份</string>
+    <string name="dialog_by_year">按年份</string>
+    <string name="label_year">年份</string>
+    <string name="label_month">月份 (1-12)</string>
+    <string name="btn_cancel">取消</string>
+    <string name="btn_confirm_delete">删除</string>
+</resources>

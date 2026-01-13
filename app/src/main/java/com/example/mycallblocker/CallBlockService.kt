@@ -10,6 +10,10 @@ import android.util.Log
 
 class CallBlockService : CallScreeningService() {
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LanguageUtil.attachBaseContext(newBase))
+    }
+
     override fun onScreenCall(callDetails: Call.Details) {
         val phoneNumber = getPhoneNumber(callDetails)
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -24,7 +28,7 @@ class CallBlockService : CallScreeningService() {
         // 逻辑判断
         if (!isInterceptionActive) {
             shouldBlock = false
-            reason = "服务暂停(用户关闭)"
+            reason = getString(R.string.reason_service_paused)
         } else {
             if (isWhitelistEnabled) {
                 // 检查权限
@@ -49,7 +53,8 @@ class CallBlockService : CallScreeningService() {
         }
 
         // 写日志
-        val actionStr = if (shouldBlock) "已拦截" else "已放行"
+        val actionStr = if (shouldBlock) getString(R.string.action_blocked) else getString(R.string.action_allowed)
+
         dbHelper.addRecord(phoneNumber, actionStr, reason)
         Log.d("CallBlocker", "电话:$phoneNumber 结果:$actionStr")
 
@@ -68,7 +73,7 @@ class CallBlockService : CallScreeningService() {
     }
 
     private fun getPhoneNumber(callDetails: Call.Details): String {
-        return callDetails.handle?.schemeSpecificPart ?: "未知"
+        return callDetails.handle?.schemeSpecificPart ?: getString(R.string.unknown_number) // 修改
     }
 
     private fun contactExists(context: Context, number: String): Boolean {

@@ -1,8 +1,10 @@
 package com.example.mycallblocker
 
 import android.Manifest
+import android.app.Activity
 import android.app.role.RoleManager
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
@@ -26,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,11 +53,14 @@ class MainActivity : ComponentActivity() {
     private val requestRoleLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { checkSystemPermissions() }
     private val requestContactPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { checkSystemPermissions() }
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LanguageUtil.attachBaseContext(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         sharedPrefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        // 监听 App 回到前台刷新权限
         val lifecycleObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) checkSystemPermissions()
         }
@@ -92,13 +98,13 @@ class MainActivity : ComponentActivity() {
                 NavigationBar {
                     NavigationBarItem(
                         icon = { Icon(Icons.Default.Home, null) },
-                        label = { Text("主页") },
+                        label = { Text(stringResource(R.string.nav_home)) },
                         selected = currentRoute == "home",
                         onClick = { currentRoute = "home"; navController.navigate("home") { popUpTo("home") { inclusive = true } } }
                     )
                     NavigationBarItem(
                         icon = { Icon(Icons.Default.List, null) },
-                        label = { Text("记录 & 设置") },
+                        label = { Text(stringResource(R.string.nav_settings)) },
                         selected = currentRoute == "settings",
                         onClick = { currentRoute = "settings"; navController.navigate("settings") { popUpTo("home") } }
                     )
@@ -134,19 +140,19 @@ fun HomeScreen(
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(modifier = Modifier.height(20.dp))
-        Text("🛡️ Call Blocker", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.title_app_name), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(30.dp))
 
         StatusDashboard(isA, isB)
         Spacer(modifier = Modifier.height(40.dp))
 
-        StatusDropdown("电话拦截服务", Icons.Default.Phone, prefInterception, isRoleHeldState.value) { enable ->
+        StatusDropdown(stringResource(R.string.setting_intercept_service), Icons.Default.Phone, prefInterception, isRoleHeldState.value) { enable ->
             prefInterception = enable
             prefs.edit().putBoolean(PREF_INTERCEPTION_ACTIVE, enable).apply()
             if (enable && !isRoleHeldState.value) onRequestRole()
         }
         Spacer(modifier = Modifier.height(24.dp))
-        StatusDropdown("通讯录白名单", Icons.Default.Person, prefWhitelist, isContactPermittedState.value) { enable ->
+        StatusDropdown(stringResource(R.string.setting_whitelist), Icons.Default.Person, prefWhitelist, isContactPermittedState.value) { enable ->
             prefWhitelist = enable
             prefs.edit().putBoolean(PREF_CONTACT_WHITELIST_ENABLED, enable).apply()
             if (enable && !isContactPermittedState.value) onRequestContact()
@@ -154,8 +160,8 @@ fun HomeScreen(
     }
 }
 
-// ======================= 页面 2: 记录与设置 (分页 + 多选) =======================
-@OptIn(ExperimentalFoundationApi::class)
+// ======================= 页面 2: 记录与设置 (全屏滑动 + 吸顶操作栏) =======================
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsAndLogsScreen(isRoleHeld: Boolean, isContactPermitted: Boolean) {
     val context = LocalContext.current
@@ -172,6 +178,9 @@ fun SettingsAndLogsScreen(isRoleHeld: Boolean, isContactPermitted: Boolean) {
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     val isSelectionMode = selectedIds.isNotEmpty()
     var showAdvancedDeleteDialog by remember { mutableStateOf(false) }
+
+    // 下拉菜单状态
+    var isLanguageMenuExpanded by remember { mutableStateOf(false) }
 
     fun loadNextPage() {
         if (isLoading || endReached) return
@@ -191,63 +200,161 @@ fun SettingsAndLogsScreen(isRoleHeld: Boolean, isContactPermitted: Boolean) {
         loadNextPage()
     }
 
+    fun restartApp() {
+        val intent = Intent(context, MainActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        context.startActivity(intent)
+        if (context is Activity) context.finish()
+    }
+
     LaunchedEffect(Unit) { refreshLogs() }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // 权限概览
-        Card(modifier = Modifier.fillMaxWidth().padding(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("App 权限状态", fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                PermissionRow("拦截服务权限", isRoleHeld)
-                PermissionRow("通讯录读取权限", isContactPermitted)
-            }
-        }
-        Divider()
+    // ============================================
+    //  修改点：整个页面是一个 LazyColumn
+    // ============================================
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 16.dp)
+    ) {
 
-        // 顶部操作栏
-        Row(
-            modifier = Modifier.fillMaxWidth().background(if (isSelectionMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent).padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (isSelectionMode) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { selectedIds = emptySet() }) { Icon(Icons.Default.Close, "取消") }
-                    Text("已选 ${selectedIds.size} 项", fontWeight = FontWeight.Bold)
-                }
-                Row {
-                    TextButton(onClick = { selectedIds = if (selectedIds.size == logs.size) emptySet() else logs.map { it.id }.toSet() }) { Text(if(selectedIds.size == logs.size) "全不选" else "全选") }
-                    IconButton(onClick = {
-                        dbHelper.deleteBatch(selectedIds.toList()); Toast.makeText(context, "已删除", Toast.LENGTH_SHORT).show(); refreshLogs()
-                    }) { Icon(Icons.Default.Delete, "删除", tint = MaterialTheme.colorScheme.error) }
-                }
-            } else {
-                Text("拦截记录", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                Row {
-                    IconButton(onClick = { showAdvancedDeleteDialog = true }) { Icon(Icons.Default.DateRange, "按日期") }
-                    IconButton(onClick = { refreshLogs() }) { Icon(Icons.Default.Refresh, "刷新") }
-                    IconButton(onClick = { dbHelper.deleteAllRecords(); refreshLogs(); Toast.makeText(context, "已清空", Toast.LENGTH_SHORT).show() }) { Icon(Icons.Default.DeleteForever, "清空") }
+        // --- 1. 语言设置区域 (作为列表的第一项) ---
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(stringResource(R.string.language_setting), fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val currentLangCode = LanguageUtil.getSavedLanguage(context)
+                    val currentLangLabel = when (currentLangCode) {
+                        "zh" -> stringResource(R.string.lang_zh)
+                        "en" -> stringResource(R.string.lang_en)
+                        else -> stringResource(R.string.lang_follow_system)
+                    }
+
+                    ExposedDropdownMenuBox(
+                        expanded = isLanguageMenuExpanded,
+                        onExpandedChange = { isLanguageMenuExpanded = !isLanguageMenuExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = currentLangLabel,
+                            onValueChange = {},
+                            readOnly = true,
+                            leadingIcon = { Icon(Icons.Default.Language, contentDescription = null) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isLanguageMenuExpanded) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent
+                            )
+                        )
+
+                        ExposedDropdownMenu(
+                            expanded = isLanguageMenuExpanded,
+                            onDismissRequest = { isLanguageMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.lang_follow_system)) },
+                                onClick = { LanguageUtil.setLanguage(context, ""); restartApp() },
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.lang_zh)) },
+                                onClick = { LanguageUtil.setLanguage(context, "zh"); restartApp() },
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.lang_en)) },
+                                onClick = { LanguageUtil.setLanguage(context, "en"); restartApp() },
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                            )
+                        }
+                    }
                 }
             }
+            Divider(color = Color.LightGray.copy(alpha = 0.5f))
         }
 
-        // 无限滚动列表
+        // --- 2. 权限概览 (作为列表的第二项) ---
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(stringResource(R.string.perm_status), fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    PermissionRow(stringResource(R.string.perm_intercept), isRoleHeld)
+                    PermissionRow(stringResource(R.string.perm_contact), isContactPermitted)
+                }
+            }
+            Divider()
+        }
+
+        // --- 3. 顶部操作栏 (吸顶 Header!) ---
+        stickyHeader {
+            // 需要给 Row 一个背景色，否则滚动时文字会重叠
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface) // 重要：背景色
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (isSelectionMode) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { selectedIds = emptySet() }) { Icon(Icons.Default.Close, stringResource(R.string.btn_cancel)) }
+                        Text(stringResource(R.string.log_selected_count, selectedIds.size), fontWeight = FontWeight.Bold)
+                    }
+                    Row {
+                        TextButton(onClick = { selectedIds = if (selectedIds.size == logs.size) emptySet() else logs.map { it.id }.toSet() }) {
+                            Text(if (selectedIds.size == logs.size) stringResource(R.string.action_unselect_all) else stringResource(R.string.action_select_all))
+                        }
+                        IconButton(onClick = {
+                            dbHelper.deleteBatch(selectedIds.toList());
+                            Toast.makeText(context, context.getString(R.string.msg_deleted), Toast.LENGTH_SHORT).show();
+                            refreshLogs()
+                        }) { Icon(Icons.Default.Delete, stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.error) }
+                    }
+                } else {
+                    Text(stringResource(R.string.log_title), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Row {
+                        IconButton(onClick = { showAdvancedDeleteDialog = true }) { Icon(Icons.Default.DateRange, stringResource(R.string.dialog_date_clean)) }
+                        IconButton(onClick = { refreshLogs() }) { Icon(Icons.Default.Refresh, stringResource(R.string.action_refresh)) }
+                        IconButton(onClick = {
+                            dbHelper.deleteAllRecords(); refreshLogs();
+                            Toast.makeText(context, context.getString(R.string.msg_cleared), Toast.LENGTH_SHORT).show()
+                        }) { Icon(Icons.Default.DeleteForever, stringResource(R.string.action_clear)) }
+                    }
+                }
+            }
+            // 操作栏下方的分割线，也跟着吸顶
+            Divider()
+        }
+
+        // --- 4. 拦截记录列表 ---
         if (logs.isEmpty() && !isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("暂无记录", color = Color.Gray) }
-        } else {
-            LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
-                itemsIndexed(logs, key = { _, item -> item.id }) { index, log ->
-                    if (index >= logs.size - 3 && !endReached && !isLoading) LaunchedEffect(Unit) { loadNextPage() }
-
-                    LogItemSelectableRow(
-                        log, selectedIds.contains(log.id), isSelectionMode,
-                        { if (isSelectionMode) selectedIds = if (selectedIds.contains(log.id)) selectedIds - log.id else selectedIds + log.id },
-                        { if (!isSelectionMode) selectedIds = selectedIds + log.id }
-                    )
+            item {
+                Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.msg_no_records), color = Color.Gray)
                 }
-                if (isLoading) item { Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(modifier = Modifier.size(24.dp)) } }
-                if (endReached && logs.isNotEmpty()) item { Text("— 没有更多了 —", modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = TextAlign.Center, color = Color.Gray) }
+            }
+        } else {
+            itemsIndexed(logs, key = { _, item -> item.id }) { index, log ->
+                if (index >= logs.size - 3 && !endReached && !isLoading) LaunchedEffect(Unit) { loadNextPage() }
+
+                LogItemSelectableRow(
+                    log, selectedIds.contains(log.id), isSelectionMode,
+                    { if (isSelectionMode) selectedIds = if (selectedIds.contains(log.id)) selectedIds - log.id else selectedIds + log.id },
+                    { if (!isSelectionMode) selectedIds = selectedIds + log.id }
+                )
+            }
+            if (isLoading) item { Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(modifier = Modifier.size(24.dp)) } }
+            if (endReached && logs.isNotEmpty()) item {
+                Text(stringResource(R.string.msg_no_more), modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = TextAlign.Center, color = Color.Gray)
             }
         }
     }
@@ -266,7 +373,8 @@ fun SettingsAndLogsScreen(isRoleHeld: Boolean, isContactPermitted: Boolean) {
 @Composable
 fun LogItemSelectableRow(log: CallRecord, isSelected: Boolean, isSelectionMode: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
     val dateStr = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(log.time))
-    val isBlocked = log.action == "已拦截"
+    val isBlocked = log.action.contains("拦截") || log.action.contains("Blocked") || log.action.contains("Block")
+
     val color = if (isBlocked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     val bg = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
 
@@ -295,35 +403,35 @@ fun AdvancedDeleteDialog(onDismiss: () -> Unit, onDeleteByMonth: (Int, Int) -> U
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("按日期清理") },
+        title = { Text(stringResource(R.string.dialog_date_clean)) },
         text = {
             Column {
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceEvenly) {
-                    FilterChip(selected = mode == "month", onClick = { mode = "month" }, label = { Text("按月份") })
-                    FilterChip(selected = mode == "year", onClick = { mode = "year" }, label = { Text("按年份") })
+                    FilterChip(selected = mode == "month", onClick = { mode = "month" }, label = { Text(stringResource(R.string.dialog_by_month)) })
+                    FilterChip(selected = mode == "year", onClick = { mode = "year" }, label = { Text(stringResource(R.string.dialog_by_year)) })
                 }
                 Spacer(Modifier.height(16.dp))
-                OutlinedTextField(value = year, onValueChange = { if(it.length<=4) year=it }, label = { Text("年份") })
-                if (mode == "month") OutlinedTextField(value = month, onValueChange = { if(it.length<=2) month=it }, label = { Text("月份 (1-12)") })
+                OutlinedTextField(value = year, onValueChange = { if(it.length<=4) year=it }, label = { Text(stringResource(R.string.label_year)) })
+                if (mode == "month") OutlinedTextField(value = month, onValueChange = { if(it.length<=2) month=it }, label = { Text(stringResource(R.string.label_month)) })
             }
         },
         confirmButton = {
             Button(onClick = {
                 val y = year.toIntOrNull(); val m = month.toIntOrNull()
                 if (y != null) { if (mode == "year") onDeleteByYear(y) else if (m != null) onDeleteByMonth(y, m) }
-            }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("删除") }
+            }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.btn_confirm_delete)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.btn_cancel)) } }
     )
 }
 
 @Composable
 fun StatusDashboard(isA: Boolean, isB: Boolean) {
     val (text, color, contentColor) = when {
-        isA && isB -> Triple("拦截所有来电除了通讯录好友", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
-        isA && !isB -> Triple("拦截所有来电 (慎用!)", MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
-        !isA && isB -> Triple("停止拦截来电", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
-        else -> Triple("MyCallBlocker 暂停使用", MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
+        isA && isB -> Triple(stringResource(R.string.status_intercept_all_except_contacts), MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
+        isA && !isB -> Triple(stringResource(R.string.status_intercept_all_warning), MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer)
+        !isA && isB -> Triple(stringResource(R.string.status_stop_intercept), MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
+        else -> Triple(stringResource(R.string.status_paused), MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
     }
     val animatedColor by animateColorAsState(color, label = "color")
     Card(colors = CardDefaults.cardColors(containerColor = animatedColor, contentColor = contentColor), modifier = Modifier.fillMaxWidth()) {
@@ -340,17 +448,25 @@ fun StatusDashboard(isA: Boolean, isB: Boolean) {
 fun StatusDropdown(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, isUserEnabled: Boolean, isSystemAuthorized: Boolean, onOptionSelected: (Boolean) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val (text, color) = when {
-        !isUserEnabled -> "已关闭" to MaterialTheme.colorScheme.outline
-        isUserEnabled && isSystemAuthorized -> "已开启 (运行中)" to MaterialTheme.colorScheme.primary
-        else -> "⚠️ 需授权" to MaterialTheme.colorScheme.error
+        !isUserEnabled -> stringResource(R.string.status_off) to MaterialTheme.colorScheme.outline
+        isUserEnabled && isSystemAuthorized -> stringResource(R.string.status_on) to MaterialTheme.colorScheme.primary
+        else -> stringResource(R.string.status_need_auth) to MaterialTheme.colorScheme.error
     }
     Column(Modifier.fillMaxWidth()) {
         Text(title, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(bottom = 8.dp, start = 4.dp))
         ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
-            OutlinedTextField(value = text, onValueChange = {}, readOnly = true, leadingIcon = { Icon(icon, null, tint = color) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) }, colors = OutlinedTextFieldDefaults.colors(focusedTextColor = color, unfocusedTextColor = color, focusedBorderColor = color, unfocusedBorderColor = color), modifier = Modifier.menuAnchor().fillMaxWidth())
+            OutlinedTextField(
+                value = text,
+                onValueChange = {},
+                readOnly = true,
+                leadingIcon = { Icon(icon, null, tint = color) },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = color, unfocusedTextColor = color, focusedBorderColor = color, unfocusedBorderColor = color),
+                modifier = Modifier.menuAnchor().fillMaxWidth()
+            )
             ExposedDropdownMenu(expanded, { expanded = false }) {
-                DropdownMenuItem({ Text("开启") }, { onOptionSelected(true); expanded = false }, leadingIcon = { Icon(Icons.Default.Check, null) })
-                DropdownMenuItem({ Text("关闭") }, { onOptionSelected(false); expanded = false }, leadingIcon = { Icon(Icons.Default.Close, null) })
+                DropdownMenuItem({ Text(stringResource(R.string.action_enable)) }, { onOptionSelected(true); expanded = false }, leadingIcon = { Icon(Icons.Default.Check, null) })
+                DropdownMenuItem({ Text(stringResource(R.string.action_disable)) }, { onOptionSelected(false); expanded = false }, leadingIcon = { Icon(Icons.Default.Close, null) })
             }
         }
     }
